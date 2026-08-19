@@ -2,6 +2,10 @@
 name    = "blinky"
 version = "0.1.0"
 
+# So plain `mcpp run` already cross-compiles.
+[build]
+target = "riscv64-none-elf"
+
 [dependencies]
 mcpplibs.riscv-virt-rt = { path = "../.." }
 

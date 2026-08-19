@@ -1,13 +1,16 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.2.0"
+version     = "0.3.0"
 description = "Board support for QEMU's RISC-V `virt` machine — libc, startup, memory layout and runner"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
 repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 
-# The target world this board runs on. Resolved by build.mcpp through
-# `mcpp::xpkg_dir`, never by reconstructing a store path.
+# ⚠️ The EMULATOR only. The target's C library used to be declared here too,
+# and should never have been: it is a property of the target, and mcpp resolves
+# it from the target's own row exactly as it resolves the compiler — a hosted
+# project does not declare glibc either. What is left is the one thing that
+# really is a board fact: how to run an image.
 [xlings]
-deps = ["xim:picolibc-riscv@1.8.12", "xim:qemu-riscv@9.2.4-1"]
+deps = ["xim:qemu-riscv@9.2.4-1"]

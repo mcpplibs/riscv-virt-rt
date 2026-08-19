@@ -5,7 +5,7 @@ C++ project builds, runs and tests with no board knowledge of its own.
 
 ```toml
 [dependencies]
-mcpplibs.riscv-virt-rt = "0.2"
+mcpplibs.riscv-virt-rt = "0.3"
 
 [targets.firmware]
 kind = "bin"
@@ -66,7 +66,7 @@ not from a second copy of this file.
 
 ## Requirements
 
-- **mcpp ≥ 2026.8.19.3.** Two separate reasons, worth keeping apart:
+- **mcpp ≥ 2026.8.19.4**, which is where the target began supplying its own C library. Two earlier boundaries, worth keeping apart:
 
   - **2026.8.19.2** is the hard floor: `build.mcpp` calls `mcpp::runner`, which
     arrived there.
@@ -88,9 +88,15 @@ not from a second copy of this file.
   name is absent, not `false` — a requires-expression over a qualified name
   that does not exist is ill-formed. There is no in-language feature test, so
   the version is documented and the diagnostic above is the fallback.
-- `xim:picolibc-riscv` and `xim:qemu-riscv`. Declared in `[xlings].deps` here
-  and installed with this package, and located at build time through
-  `mcpp::xpkg_dir` rather than by reconstructing a store path.
+- `xim:qemu-riscv`, declared in `[xlings].deps` and located through
+  `mcpp::xpkg_dir`.
+
+  ⚠️ The target's **C library is not declared here** and should not be. It is a
+  property of the target, and mcpp resolves it from the target's own row the
+  same way it resolves the compiler — its headers are on every compile line and
+  its directory on the link search path before this package says anything. That
+  is why the linker line below is bare names (`-lc`, `-lcrt0-semihost`): this
+  package chooses *which* pieces, not *where* they are.
 
 ## Why the libc headers are not yours
 

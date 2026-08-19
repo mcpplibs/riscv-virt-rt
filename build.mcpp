@@ -1,55 +1,55 @@
 import mcpp;
 import std;
 
-// riscv-virt-rt — everything a consumer needs to build and run for QEMU's
-// RISC-V `virt` machine, and nothing it should have to know.
+// riscv-virt-rt — the BOARD, and only the board.
 //
-// WHAT THIS FILE IS FOR
+// WHAT IS *NOT* HERE ANY MORE, AND WHY THAT MATTERS
 //
-// mcpp knows what a bare-metal TARGET is (an ISA, a calling convention, a code
-// model). It deliberately does not know what a BOARD is: which C library, where
-// RAM starts, which emulator drives it. That is this package, and swapping it
-// for another one is how a user changes boards.
+// This file used to locate picolibc and hand out its include and library
+// paths. It no longer does: the target's C library is a property of the
+// TARGET, and mcpp resolves it the same way it resolves the compiler — the
+// row for `riscv*-none-elf` in its target table names both. A hosted project
+// never wrote down `xim:glibc`, and a bare-metal one should not have to write
+// down picolibc.
+//
+// What remains here is the part that is genuinely the board's, and it is a
+// short list: WHICH startup object and libraries to select out of that C
+// library, WHICH linker script describes this machine's memory, and HOW to
+// run an image. Location is a target fact; selection is a board fact.
 int main() {
-    const char* sysroot = mcpp::xpkg_dir("xim", "picolibc-riscv");
-    if (!sysroot || !*sysroot) {
-        std::cerr << "riscv-virt-rt: xim:picolibc-riscv is declared in "
-                     "[xlings].deps but is not installed\n";
-        return 1;
-    }
-
-    // The profile comes from the target mcpp resolved, so one BSP serves both
-    // widths. A second board differs in this table and nowhere else.
     const std::string arch = mcpp::target_arch() ? mcpp::target_arch() : "";
     const bool rv32 = (arch == "riscv32");
-    const std::string profile = rv32 ? "rv32imac/ilp32" : "rv64gc/lp64d";
-    const std::string rtArch  = rv32 ? "riscv32" : "riscv64";
-    const std::string lib = std::format("{}/lib/{}", sysroot, profile);
 
-    // ⚠️ PACKAGE-PRIVATE, and that is the design. These are riscv*-none-elf
-    // headers; widening the consumer's include path with them would let it
-    // `#include <stdio.h>` and get a header for a target its own translation
-    // unit may not be built for. Consumers import the module below instead.
-    mcpp::include_dir(std::format("{}/include/{}", sysroot, profile).c_str());
-
-    // Link side — these DO reach the consumer.
-    mcpp::link_search(lib.c_str());
+    // ⚠️ Selected out of the C library, not located in it. `-L` for the target
+    // sysroot is already on the link line, so these are bare names — which is
+    // also what makes the same two lines work for both widths.
     mcpp::link_lib("crt0-semihost");   // pulled from the archive by ENTRY(_start)
     mcpp::link_lib("c");
     mcpp::link_lib("semihost");
-    // ⚠️ Not optional. picolibc's printf formats floats through ryu, which does
-    // 128-bit shifts; rv64 has no instruction for them, so without the builtins
-    // the link fails on __ashlti3/__lshrti3. Note a "does 64-bit division work"
-    // check does NOT reach this — rv64gc has a hardware divu.
-    mcpp::link_lib(std::format("clang_rt.builtins-{}", rtArch).c_str());
-    // The memory layout. The one thing a consumer cannot write for itself.
-    mcpp::link_script(std::format("{}/picolibcpp.ld", lib).c_str());
+    // ⚠️ Not optional, and not a target fact either. picolibc's printf formats
+    // floats through ryu, which does 128-bit shifts, and rv64 has no
+    // instruction for them — without the builtins the link fails on
+    // __ashlti3/__lshrti3. Note that a "does 64-bit division work" check does
+    // NOT reach this: rv64gc has a hardware divu.
+    mcpp::link_lib(std::format("clang_rt.builtins-{}",
+                               rv32 ? "riscv32" : "riscv64").c_str());
+
+    // The memory layout — the one thing a consumer cannot write for itself.
+    //
+    // ⚠️ Asked for, not declared. The board knows WHICH script describes this
+    // machine; where the target's C library put it is the engine's answer.
+    // (A bare name would not do: link-script resolves relative paths against
+    // the PACKAGE root, so `picolibcpp.ld` would point inside this package.)
+    if (const char* sysroot = mcpp::sysroot_dir(); sysroot && *sysroot)
+        mcpp::link_script(std::format("{}/lib/{}/picolibcpp.ld", sysroot,
+                                      rv32 ? "rv32imac/ilp32" : "rv64gc/lp64d").c_str());
 
     // How to run it. ⚠️ Absolute path: a bare name resolves through PATH to a
     // shim that dispatches against its own owner home, which is not
     // necessarily the home this build uses.
     if (const char* qemu = mcpp::xpkg_dir("xim", "qemu-riscv"); qemu && *qemu) {
-        mcpp::runner(std::format("{}/bin/qemu-system-{}", qemu, rtArch).c_str());
+        mcpp::runner(std::format("{}/bin/qemu-system-{}", qemu,
+                                 rv32 ? "riscv32" : "riscv64").c_str());
         for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
                        "-semihosting", "-bios", "none", "-kernel"})
             mcpp::runner(a);

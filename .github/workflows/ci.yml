@@ -21,7 +21,7 @@ jobs:
       #     exec'ing the firmware on the host instead of the emulator. The
       #     package works on .2; the documented workflow does not.
       # CI pins what the README tells people to use.
-      MCPP_VERSION: 2026.8.19.3
+      MCPP_VERSION: 2026.8.19.4
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:
@@ -48,8 +48,8 @@ jobs:
           # one of them answers "not installed" from the other.
           xlings install xim:qemu-riscv -y
           XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:qemu-riscv -y
-          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:picolibc-riscv -y
-          test -d "$HOME/.mcpp/registry/data/xpkgs/xim-x-picolibc-riscv"
+          # ⚠️ NOT picolibc: mcpp installs the target's C library itself, from
+          # the target's row. Installing it here would hide a regression in that.
 
       - name: Self-test (rv64)
         run: |
