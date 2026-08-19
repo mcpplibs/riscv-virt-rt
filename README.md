@@ -5,7 +5,7 @@ C++ project builds, runs and tests with no board knowledge of its own.
 
 ```toml
 [dependencies]
-mcpplibs.riscv-virt-rt = "0.1"
+mcpplibs.riscv-virt-rt = "0.2"
 
 [targets.firmware]
 kind = "bin"
@@ -21,6 +21,18 @@ extern "C" int main() {
     return 0;
 }
 ```
+
+## Starting from scratch
+
+```bash
+mcpp new blinky --template riscv-virt-rt
+cd blinky && mcpp run
+```
+
+The template ships **with this package**, so it cannot drift from it: `mcpp new`
+writes the dependency line at the version it resolved.
+
+## Adding it to a project
 
 ```bash
 mcpp build --target riscv64-none-elf     # firmware + .bin + .map + a size summary

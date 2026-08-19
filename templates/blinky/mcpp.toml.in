@@ -1,0 +1,16 @@
+[package]
+name    = "{{project.name}}"
+version = "0.1.0"
+
+# The default target, so plain `mcpp build` / `mcpp run` / `mcpp test` are
+# already cross-compiling. Pass `--target riscv32-none-elf` to switch width;
+# the board package serves both from one descriptor.
+[build]
+target = "riscv64-none-elf"
+
+# ⭐ There is deliberately no [target.*] section. The linker script, the load
+# address, the C library and the emulator invocation all travel with the board
+# package, which is what makes changing boards a dependency change.
+#
+# The dependency line below is written by `mcpp new` at the version it
+# resolved, so this template cannot drift from the package that ships it.

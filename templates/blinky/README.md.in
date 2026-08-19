@@ -1,0 +1,27 @@
+# {{project.name}}
+
+Bare-metal RISC-V firmware for QEMU's `virt` machine.
+
+```bash
+mcpp build                            # firmware + .bin + .map + a size summary
+mcpp run                              # boots in qemu
+mcpp test                             # each tests/*.cpp runs as its own image
+mcpp build --target riscv32-none-elf  # the other width, same source
+```
+
+The board — libc, startup, memory layout and the emulator — comes from
+[`{{template.package.name}}`](https://github.com/{{template.package.namespace}}/{{template.package.name}}),
+declared in `mcpp.toml` as an ordinary dependency. Changing boards is changing
+that line.
+
+## What to look at first
+
+| | |
+|---|---|
+| `src/main.cpp` | an ordinary `int main()` — the board package supplies the crt0 that calls it |
+| `tests/boots.cpp` | a test that runs **on the target**, under the emulator |
+| `mcpp.toml` | `[build] target` picks the ISA; there is no `[target.*]` section |
+
+The `.map` beside the built ELF is where to look when a section did not end up
+where expected, and the size summary printed after each build is the number
+that decides whether the image fits.

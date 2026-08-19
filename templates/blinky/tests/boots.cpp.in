@@ -1,0 +1,21 @@
+// A bare-metal test is an ordinary mcpp test: one image per case, run under
+// the emulator the board package supplies, non-zero to fail.
+//
+//     mcpp test
+//
+// ⚠️ This file exists so that a brand-new project has something to run. A
+// bare-metal project whose tests only ever ran on the host is a project whose
+// tests never touched the target.
+import mcpplibs.riscv_virt_rt;
+
+extern "C" int main() {
+    board::println("boots: console");
+
+    void* p = board::alloc(128);
+    if (!p) return 1;
+    board::fill(p, 0xA5, 128);
+    const auto* b = static_cast<const unsigned char*>(p);
+    const bool ok = b[0] == 0xA5 && b[127] == 0xA5;
+    board::release(p);
+    return ok ? 0 : 1;
+}

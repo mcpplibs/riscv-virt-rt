@@ -1,0 +1,3 @@
+[template]
+description = "Bare-metal RISC-V firmware for QEMU's virt machine — builds, boots and tests out of the box"
+default     = true

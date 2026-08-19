@@ -1,0 +1,26 @@
+// {{project.name}} — firmware for QEMU's RISC-V `virt` machine.
+//
+// Built by `mcpp new {{project.name}} --template {{template.package.name}}`.
+//
+// This is an ordinary `main`: the board package supplies picolibc's semihosting
+// crt0, so the C runtime is up before this runs and returning from here powers
+// the machine down. Only a zero-libc board needs an assembly entry point.
+import mcpplibs.riscv_virt_rt;
+
+extern "C" int main() {
+    board::println("hello from {{project.name}}");
+
+    // Printing a float is not decoration — it is the one line that proves the
+    // compiler-rt builtins are linked. picolibc formats floats through ryu,
+    // which does 128-bit shifts, and rv64 has no instruction for those.
+    board::printf("float %.4f\n", 3.14159);
+
+    void* p = board::alloc(64);
+    board::println(p ? "heap ok" : "heap FAILED");
+    board::release(p);
+
+    // The exit code reaches the host: semihosting carries it out to the
+    // emulator, so `mcpp run` and `mcpp test` read a verdict here exactly as
+    // they do for a host program.
+    return p ? 0 : 1;
+}
