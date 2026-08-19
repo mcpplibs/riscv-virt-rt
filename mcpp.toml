@@ -1,0 +1,13 @@
+[package]
+namespace   = "mcpplibs"
+name        = "riscv-virt-rt"
+version     = "0.1.0"
+description = "Board support for QEMU's RISC-V `virt` machine — libc, startup, memory layout and runner"
+license     = "Apache-2.0"
+authors     = ["mcpplibs"]
+repo        = "https://github.com/mcpplibs/riscv-virt-rt"
+
+# The target world this board runs on. Resolved by build.mcpp through
+# `mcpp::xpkg_dir`, never by reconstructing a store path.
+[xlings]
+deps = ["xim:picolibc-riscv@1.8.12", "xim:qemu-riscv@9.2.4-1"]

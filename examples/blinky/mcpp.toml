@@ -1,0 +1,10 @@
+[package]
+name    = "blinky"
+version = "0.1.0"
+
+[dependencies]
+mcpplibs.riscv-virt-rt = { path = "../.." }
+
+[targets.firmware]
+kind = "bin"
+main = "src/main.cpp"

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# One job, and it is an emulator job on purpose: a bare-metal package that
+# only ever type-checks is a package that has never been proven to boot.
+jobs:
+  build:
+    name: build + run + test (riscv64 & riscv32, qemu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # ⚠️ This pin IS the version floor from the README, checked by machine.
+      # `mcpp::runner` arrived here; an earlier mcpp cannot compile build.mcpp.
+      MCPP_VERSION: 2026.8.19.2
+      XLINGS_VERSION: v2026.8.17.2
+      XLINGS_NON_INTERACTIVE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xlings
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/openxlings/xlings/main/tools/other/quick_install.sh \
+            | bash -s "$XLINGS_VERSION"
+          echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
+
+      - name: Install mcpp
+        run: |
+          xlings update
+          xlings install "mcpp@$MCPP_VERSION" -y -g
+          mcpp --version
+          mcpp self config --mirror GLOBAL
+
+      - name: Install the target world
+        run: |
+          # ⚠️ BOTH homes, and this is not belt-and-braces. The shim on PATH
+          # dispatches against whichever home owns it, while `mcpp run` starts
+          # the runner through mcpp's own home — an emulator present in only
+          # one of them answers "not installed" from the other.
+          xlings install xim:qemu-riscv -y
+          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:qemu-riscv -y
+          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:picolibc-riscv -y
+          test -d "$HOME/.mcpp/registry/data/xpkgs/xim-x-picolibc-riscv"
+
+      - name: Self-test (rv64)
+        run: |
+          mcpp build --target riscv64-none-elf
+          mcpp test  --target riscv64-none-elf 2>&1 | tee test64.log
+          # ⚠️ A suite that discovered nothing exits 0. Assert the case RAN.
+          grep -q 'console ... ok' test64.log
+
+      - name: Self-test (rv32)
+        run: |
+          # The second profile exists to prove the ISA table is data, not a
+          # second copy of the package. It links; qemu-system-riscv32 boots it.
+          mcpp build --target riscv32-none-elf
+          mcpp test  --target riscv32-none-elf 2>&1 | tee test32.log
+          grep -q 'console ... ok' test32.log
+
+      - name: The example is the README's claim, executed
+        working-directory: examples/blinky
+        run: |
+          mcpp run --target riscv64-none-elf 2>&1 | tee run.log
+          # Each line proves a different part of the chain: the module, the
+          # float path (which is what needs compiler-rt builtins), the heap.
+          grep -q 'hello from qemu virt' run.log
+          grep -q 'float 3.1416'         run.log
+          grep -q 'heap ok'              run.log
+
+      - name: The artifact set a flasher needs
+        working-directory: examples/blinky
+        run: |
+          elf="$(find target/riscv32-none-elf target/riscv64-none-elf \
+                   -name firmware -type f | head -1)"
+          test -n "$elf"
+          test -f "$elf.bin"
+          test -f "$elf.map"
