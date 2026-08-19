@@ -66,9 +66,16 @@ not from a second copy of this file.
 
 ## Requirements
 
-- **mcpp ≥ 2026.8.19.2**, because `build.mcpp` calls `mcpp::runner`, which
-  arrived in that version. On an older mcpp the build stops while compiling
-  `build.mcpp`:
+- **mcpp ≥ 2026.8.19.3.** Two separate reasons, worth keeping apart:
+
+  - **2026.8.19.2** is the hard floor: `build.mcpp` calls `mcpp::runner`, which
+    arrived there.
+  - **2026.8.19.3** is the version to actually use. On 2026.8.19.2 this package
+    builds and `mcpp run` works, but `mcpp build` **followed by** `mcpp run`
+    executes the firmware on the host instead of the emulator — it prints
+    nothing and exits 1.
+
+  Below the hard floor the build stops while compiling `build.mcpp`:
 
   ```
   error: 'runner' is not a member of 'mcpp'

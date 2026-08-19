@@ -14,9 +14,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      # ⚠️ This pin IS the version floor from the README, checked by machine.
-      # `mcpp::runner` arrived here; an earlier mcpp cannot compile build.mcpp.
-      MCPP_VERSION: 2026.8.19.2
+      # ⚠️ Two different numbers, and this is the higher one.
+      #   * 2026.8.19.2 is where `mcpp::runner` arrived — below it build.mcpp
+      #     does not COMPILE, so that is the hard floor.
+      #   * 2026.8.19.3 is where `mcpp build` followed by `mcpp run` stopped
+      #     exec'ing the firmware on the host instead of the emulator. The
+      #     package works on .2; the documented workflow does not.
+      # CI pins what the README tells people to use.
+      MCPP_VERSION: 2026.8.19.3
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:
