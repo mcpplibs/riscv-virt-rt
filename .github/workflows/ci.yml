@@ -89,6 +89,99 @@ jobs:
           grep -q 'float 3.1416'         run.log
           grep -q 'heap ok'              run.log
 
+      # ⚠️ THE ZERO-LIBC TIER, BOTH SIDES. THIS BOARD ANSWERED THE QUESTION
+      # THREE DIFFERENT WAYS IN THREE VERSIONS, WHICH IS WHY IT IS TESTED.
+      #
+      # 0.4.0 refused, 0.4.1 degraded silently, 0.5.0 serves the tier behind a
+      # feature. Each answer looked right until the next question — and what
+      # survives a fourth change of mind is not a comment but a test that states
+      # the outcome on both sides.
+      #
+      # The positive side asserts the LINK ADDRESS rather than any output,
+      # because that is what proves the board's own memory map was used. An
+      # image that printed would prove only that something printed; 0x80000000
+      # is in `virt.ld` and nowhere in the consumer.
+      - name: With `nolibc`, the board serves a project that has no C library
+        run: |
+          mkdir -p /tmp/nl/src
+          cat > /tmp/nl/mcpp.toml <<EOF
+          [package]
+          name    = "nl"
+          version = "0.1.0"
+
+          [build]
+          target = "riscv64-none-elf"
+
+          [target.riscv64-none-elf]
+          sysroot = ""
+
+          [dependencies]
+          riscv-virt-rt = { path = "$GITHUB_WORKSPACE", features = ["nolibc"] }
+          EOF
+          cat > /tmp/nl/src/main.cpp <<'EOF'
+          import mcpplibs.riscv_virt_rt;
+          extern "C" [[noreturn]] void _start() {
+              board::println("bsp nolibc console ok");
+              board::poweroff();
+          }
+          EOF
+          (cd /tmp/nl && mcpp build --target riscv64-none-elf)
+
+          elf="$(find /tmp/nl/target -name nl -type f | head -1)"
+          test -n "$elf"
+          READELF="$(find "$HOME/.mcpp/registry/data/xpkgs" -name llvm-readelf | head -1)"
+          NM="$(find "$HOME/.mcpp/registry/data/xpkgs" -name llvm-nm | head -1)"
+
+          # The board's virt.ld put .text here. Nothing in the consumer says so.
+          "$READELF" -S "$elf" | grep -E '\.text' | grep -q '0000000080000000'
+
+          # And it depends on nothing: there is no C library to depend on, so an
+          # undefined symbol would mean the link silently expected one.
+          undef="$("$NM" -u "$elf" | wc -l)"
+          test "$undef" -eq 0 || { "$NM" -u "$elf"; echo "expected no undefined symbols"; exit 1; }
+
+          # The symbols the board's script exports reached the image.
+          "$NM" "$elf" | grep -q '__stack_top'
+
+      # The negative side. Asserted on the CONTENT, not the exit status: the
+      # build also fails when the message is the unreadable one this branch
+      # exists to replace.
+      - name: Without it, the contradictory request is refused in words
+        run: |
+          sed -i 's/, features = \["nolibc"\]//' /tmp/nl/mcpp.toml
+          rm -rf /tmp/nl/target
+          if (cd /tmp/nl && mcpp build --target riscv64-none-elf > out.log 2>&1); then
+            echo "a project that declined the C library built against a picolibc board"
+            exit 1
+          fi
+          # It names the key that caused it, the C library the board is written
+          # against, and the feature that resolves it.
+          grep -q 'sysroot'  /tmp/nl/out.log
+          grep -q 'picolibc' /tmp/nl/out.log
+          grep -q 'nolibc'   /tmp/nl/out.log
+          # And it does NOT surface as a missing header inside this package,
+          # which is what the silently-degrading version produced.
+          if grep -q "fatal error: 'stdio.h' file not found" /tmp/nl/out.log; then
+            echo "the failure surfaced as a missing header inside the package"
+            exit 1
+          fi
+
+      # Both templates target the same machine; the difference is how much of
+      # this board's datasheet each copies into the project. A template that
+      # generates a project which does not build is a defect that only the
+      # generated project can reveal — measured once already, on `nolibc`.
+      - name: Both zero-libc templates generate projects that build
+        run: |
+          for t in nolibc nolibc-bsp; do
+            rm -rf "/tmp/t-$t"; mkdir -p "/tmp/t-$t"
+            (cd "/tmp/t-$t" && mcpp new k --template "riscv-virt-rt:$t")
+            # ⚠️ The scaffolder resolves the template from the INDEX, so this
+            # exercises the published package. The dependency it writes (or
+            # declines to write) is part of what is under test.
+            (cd "/tmp/t-$t/k" && mcpp build)
+            echo "$t: $(find "/tmp/t-$t/k" -type f -not -path '*/target/*' | wc -l) files"
+          done
+
       - name: The artifact set a flasher needs
         working-directory: examples/blinky
         run: |
@@ -97,3 +190,72 @@ jobs:
           test -n "$elf"
           test -f "$elf.bin"
           test -f "$elf.map"
+
+  # ---------------------------------------------------------------------------
+  # The cross-compilation is performed FROM three systems, not only from Linux.
+  #
+  # Every target in this repository is a cross target, which makes the host a
+  # separate axis from the target: the compiler, the target C library and the
+  # emulator are payloads mcpp resolves for whichever system it is running on.
+  # A package that has only ever been built from Linux is a package whose
+  # consumers must use Linux, and nothing in these sources says so.
+  #
+  # ⚠️ A TOOLCHAIN AXIS IS ABSENT HERE, AND THAT IS MEASURED RATHER THAN
+  # ASSUMED. The row for a bare-metal triple names its compiler, and the
+  # command-line override does not displace it: `--toolchain gcc@16.1.0` on a
+  # `riscv64-none-elf` build resolves llvm@22.1.8 regardless. A matrix over
+  # compiler families would therefore run the same compiler on every row and
+  # report coverage it does not have. The toolchain axis belongs where the
+  # choice is real — openkal, whose declarations are compiled by three families
+  # on three systems.
+  #
+  # ⚠️ BUILD ONLY, AND DELIBERATELY. Behaviour is asserted once, above, under an
+  # emulator. Booting the same image from three systems would be a statement
+  # about the emulator rather than about this package, and "the image does what
+  # the README says" does not become more true for having been observed from
+  # macOS.
+  portability:
+    name: cross-builds from ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    defaults:
+      run:
+        shell: bash
+    env:
+      MCPP_VERSION: 2026.8.20.2
+      XLINGS_VERSION: v2026.8.17.2
+      XLINGS_NON_INTERACTIVE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xlings (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/openxlings/xlings/main/tools/other/quick_install.sh \
+            | bash -s "$XLINGS_VERSION"
+          echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
+
+      - name: Install xlings (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm https://d2learn.org/xlings-install.ps1.txt | iex
+          # The installer amends the user's environment; no later step in this
+          # job reads it back, so the directory is named here.
+          "$env:USERPROFILE\.xlings\subos\current\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install mcpp
+        run: |
+          xlings update
+          xlings install "mcpp@$MCPP_VERSION" -y -g
+          mcpp --version
+          mcpp self config --mirror GLOBAL
+
+      - name: Both profiles cross-build
+        run: |
+          mcpp build --target riscv64-none-elf
+          mcpp build --target riscv32-none-elf

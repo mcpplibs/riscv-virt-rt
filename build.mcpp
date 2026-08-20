@@ -66,23 +66,60 @@ int main() {
         }
     };
 
-    // ⚠️ NO C LIBRARY IS NOT AN ERROR HERE, AND TREATING IT AS ONE WAS A BUG.
+    // ⚠️ NO C LIBRARY IS A SUPPORTED WAY TO USE THIS BOARD, AND ARRIVING AT
+    // THAT TOOK THREE ANSWERS. THE HISTORY IS THE ARGUMENT.
     //
-    // A project on the zero-libc tier (`[target.<triple>].sysroot = ""`) is not
-    // asking this board for anything: it supplies its own entry point, its own
-    // memory map and its own device access. It may still carry this package as
-    // a dependency, because `mcpp new --template` writes the template's own
-    // package into the manifest at the version it resolved — which is what
-    // keeps a template from drifting from the library that ships it.
+    // 0.4.0 treated it as an error: this board is written against picolibc, so
+    // a project that declines the C library and still depends on it was making
+    // two statements that cannot both hold.
     //
-    // Measured: `mcpp new k --template riscv-virt-rt:nolibc` then `mcpp run`
-    // failed here, on a template whose whole point is to depend on nothing.
-    // Contributing nothing is the correct answer; there is nothing to select
-    // out of a C library that is not there.
+    // That broke `mcpp new k --template riscv-virt-rt:nolibc`, because the
+    // scaffolder wrote this package into the generated manifest and the
+    // template's whole point is to depend on nothing. 0.4.1 made this branch
+    // degrade silently instead — emit the runner, contribute nothing else — and
+    // separately gave the template `[template.inject] self = false` so that the
+    // dependency was not written at all. Two fixes for one problem; the second
+    // removed the reason for the first, which then only served to delay the
+    // failure until the board's own module was compiled, where it surfaced as
+    // `fatal error: 'stdio.h' file not found` inside a package the reader did
+    // not write.
+    //
+    // Both answers shared a premise, and the premise was wrong. A RISC-V
+    // developer working without a C library does not need LESS of a board
+    // package — they need more of one. Which emulator boots this machine, where
+    // its UART is, where RAM begins: none of that is a C library fact, and
+    // refusing merely moved it, hardcoded, into every kernel project. That is
+    // the coupling a BSP exists to remove.
+    //
+    // So the C library is a feature of how this board is CONSUMED. With
+    // `features = ["nolibc"]` the board contributes what it knows that does not
+    // depend on one; without it, the request really is contradictory and is
+    // still refused, now naming the feature that resolves it.
     if (libc.empty()) {
+        if (!mcpp::has_feature("nolibc")) {
+            std::cerr <<
+                "riscv-virt-rt: this project declined the target's C library\n"
+                "  (`[target.<triple>].sysroot = \"\"`) but asks this board for the\n"
+                "  picolibc arrangement, which is its console, its startup object and\n"
+                "  its linker script. Those cannot be supplied without one.\n"
+                "\n"
+                "  The board CAN serve this tier — a memory map, a UART console and\n"
+                "  an emulator to run under need no C library. Ask for that half:\n"
+                "\n"
+                "      riscv-virt-rt = { version = \"0.5.0\", features = [\"nolibc\"] }\n"
+                "\n"
+                "  To use the picolibc arrangement instead, remove the `sysroot` line.\n";
+            return 1;
+        }
+
+        // The memory map. ⚠️ A package-relative path, which `link-script`
+        // resolves against the PACKAGE root — so this names the board's own
+        // file rather than something in the consumer's directory.
+        mcpp::link_script("virt.ld");
         emit_runner();
         mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
         mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC");
+        mcpp::rerun_if_env_changed("MCPP_FEATURE_NOLIBC");
         return 0;
     }
 

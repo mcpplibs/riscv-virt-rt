@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.4.1"
+version     = "0.5.0"
 description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -36,6 +36,27 @@ deps = ["xim:qemu-riscv@9.2.4-1"]
 [features]
 default = []
 openkal = { sources = ["src/kal/**"] }
+
+# ⚠️ THE C LIBRARY IS A FEATURE OF HOW THIS BOARD IS CONSUMED, NOT A PROPERTY OF
+# THE BOARD.
+#
+# 0.4.0 and 0.4.1 both assumed the opposite and answered "no C library" by
+# refusing and then by degrading. The premise was wrong: a RISC-V developer
+# working without a C library needs MORE of a board package, not less. Which
+# emulator boots this machine, where its UART is, where RAM begins — none of
+# those are C library facts, and refusing merely moved them, hardcoded, into
+# every kernel project.
+#
+# With this feature the board contributes the half that needs no C library: the
+# memory map (virt.ld), a UART console, and the emulator to run under. It
+# carries no sources of its own — the module is one file describing the same
+# machine twice, and `-DMCPP_FEATURE_NOLIBC` selects which half compiles.
+#
+# What it deliberately does NOT supply, because a board package supplying them
+# would be supplying a second one: formatting (std-freestanding), an allocator
+# (std-freestanding with alloc-kal), and memcpy/memset (std-freestanding-nolibc,
+# which provides them once for every board).
+nolibc  = {}
 
 # Resolved only when the feature is active, so a consumer that does not use
 # openkal pulls neither the declarations nor the implementation.

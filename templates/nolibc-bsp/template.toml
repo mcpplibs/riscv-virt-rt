@@ -1,0 +1,18 @@
+[template]
+description = "A kernel starting point that takes the board's half: no C library, but the memory map, the console and the emulator come from the BSP"
+
+# ⚠️ THE SELF-DEPENDENCY IS INJECTED HERE, WITH A FEATURE — WHICH IS THE WHOLE
+# DIFFERENCE BETWEEN THIS TEMPLATE AND `nolibc`.
+#
+# The sibling template targets the same machine and depends on nothing: it
+# carries its own linker script, writes the UART address into its source, and
+# names the emulator in its manifest. That is the honest picture of what a
+# kernel actually requires, and it is the right thing to read first.
+#
+# It is not the right thing to MAINTAIN. Where the UART sits and where RAM
+# begins are facts about this board, identical in every project that targets it,
+# and a copy of them in each project is the coupling a board package exists to
+# remove. With `features = ["nolibc"]` the board contributes exactly the half
+# that needs no C library.
+[template.inject]
+self = { features = ["nolibc"] }

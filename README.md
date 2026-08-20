@@ -32,6 +32,46 @@ cd blinky && mcpp run
 The template ships **with this package**, so it cannot drift from it: `mcpp new`
 writes the dependency line at the version it resolved.
 
+## Without a C library
+
+A project on the zero-libc tier — `[target.riscv64-none-elf].sysroot = ""` — has
+no `<stdio.h>`, no startup object and no runtime. That is the arrangement a
+kernel or a bootloader begins from, and this board serves it:
+
+```toml
+[dependencies]
+riscv-virt-rt = { version = "0.5.0", features = ["nolibc"] }
+```
+
+⭐ **The C library is a feature of how this board is consumed, not a property of
+the board.** Versions 0.4.0 and 0.4.1 assumed the opposite — first refusing the
+combination, then degrading silently — and both were wrong for the same reason:
+a developer working without a C library needs *more* of a board package, not
+less. Where the UART sits, where RAM begins and which emulator boots this
+machine are not C library facts, and refusing merely moved them, hardcoded, into
+every kernel project.
+
+With the feature the board contributes exactly that half: `virt.ld`, a console
+that writes the UART directly, and the emulator. Without it, the request really
+is contradictory and is refused with a message naming the feature.
+
+Two templates target this tier, and the difference between them is not what the
+program does — it is how much of this board's datasheet is copied into the
+project:
+
+```bash
+mcpp new k --template riscv-virt-rt:nolibc       # depends on nothing: 5 files
+mcpp new k --template riscv-virt-rt:nolibc-bsp   # takes the board's half: 2 files
+```
+
+The first is the accurate picture of what a kernel requires, and the better one
+to read first. The second is the one to maintain.
+
+What the board does **not** supply on this tier, because supplying it would mean
+supplying a second one: formatting (`std-freestanding`), an allocator
+(`std-freestanding` with `alloc-kal`), and `memcpy`/`memset`
+(`std-freestanding-nolibc`, which provides them once for every board).
+
 ## Adding it to a project
 
 ```bash

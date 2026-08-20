@@ -1,0 +1,50 @@
+// {{project.name}} — a kernel starting point on QEMU's RISC-V `virt` machine.
+//
+// WHAT IS UNDER THIS FILE, AND WHAT IS NOT
+//
+// No C library, no startup object, no runtime: the manifest declines the
+// target's C library, so beneath this source there is the compiler, the
+// instruction set, and the board package.
+//
+// WHAT THE BOARD PACKAGE CONTRIBUTES, AND WHY IT IS NOT NOTHING
+//
+// Three things this program cannot derive and should not guess:
+//
+//   the memory map    where this machine begins executing (0x80000000) and
+//                     where its stack can go — the board's `virt.ld`, which
+//                     also exports the `__stack_top` the entry stub below uses
+//   the console       `board::println` writes the machine's UART; the address
+//                     is the board's to know
+//   the emulator      which one boots this machine, and with which arguments
+//
+// The sibling template writes all three into the project. Compare them: what
+// changes is not what the program does but how much of this board's datasheet
+// is copied into it.
+import mcpplibs.riscv_virt_rt;
+
+extern "C" void kmain() {
+    board::println("{{project.name}}: running with no C library");
+
+    // ⚠️ NO `printf` ON THIS TIER, AND THE ABSENCE IS DELIBERATE. Formatting is
+    // the C library's work; a board package that grew its own would be a small,
+    // worse one. A project that wants it adds `std-freestanding` with the
+    // `nolibc` feature and imports <format>.
+    board::println("answer 42");
+
+    // Ends the run on the firmware's terms rather than on the emulator's
+    // timeout, which is what lets `mcpp run` report a verdict at all.
+    board::poweroff();
+}
+
+// The first instruction executed. `_start` establishes a stack and enters C++;
+// `__stack_top` is defined by the BOARD's linker script, not by this project.
+//
+// `.text.entry` is placed first by that script, because execution begins at the
+// load address rather than at whichever function the linker chose to put there.
+asm(".section .text.entry\n"
+    ".globl _start\n"
+    "_start:\n"
+    "  la sp, __stack_top\n"
+    "  call kmain\n"
+    "1:\n"
+    "  j 1b\n");

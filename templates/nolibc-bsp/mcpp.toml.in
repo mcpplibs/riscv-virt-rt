@@ -1,0 +1,26 @@
+[package]
+name    = "{{project.name}}"
+version = "0.1.0"
+
+[build]
+target = "riscv64-none-elf"
+
+# ⚠️ THE ONE LINE THAT MAKES THIS A KERNEL PROJECT.
+#
+# The target table binds a C library to every bare-metal triple. An empty string
+# declines it: no headers reach the compile line, no library directory reaches
+# the link, and `#include <stdio.h>` stops resolving. What is left is the
+# compiler, the instruction set, and this source tree.
+[target.riscv64-none-elf]
+sysroot = ""
+
+# ⚠️ NO `runner`, NO `link.ld` AND NO `build.mcpp` IN THIS PROJECT, AND THAT IS
+# WHAT THE DEPENDENCY BELOW BUYS.
+#
+# The board package supplies all three: the emulator that boots this machine (by
+# absolute path, so it does not resolve through a shim owned by another home),
+# the memory map, and a console that writes the UART directly. The sibling
+# template `--template riscv-virt-rt:nolibc` writes them out instead, which is
+# worth reading once and not worth maintaining.
+#
+# The dependency line is written by `mcpp new` at the version it resolved.

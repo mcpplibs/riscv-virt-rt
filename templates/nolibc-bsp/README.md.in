@@ -1,0 +1,36 @@
+# {{project.name}}
+
+A kernel starting point for QEMU's RISC-V `virt` machine, with no C library.
+
+```sh
+mcpp run
+```
+
+## What is beneath this project
+
+Nothing but the compiler, the instruction set, and the board package. The
+manifest declines the target's C library with `sysroot = ""`, so `<stdio.h>`
+does not resolve and no startup object runs before `_start`.
+
+The board package is depended upon with `features = ["nolibc"]`, which selects
+the half of it that needs no C library: the memory map, a console that writes
+the UART directly, and the emulator to run under. The project therefore contains
+two files — this one and an entry point.
+
+## The other starting point
+
+`mcpp new <name> --template riscv-virt-rt:nolibc` targets the same machine and
+depends on nothing at all: it carries its own linker script, writes the UART
+address into its source, and names the emulator in its manifest. That is the
+accurate picture of what a kernel requires, and the better one to read first.
+
+The difference between the two is not what the program does. It is how much of
+this board's datasheet is copied into the project.
+
+## Adding to it
+
+| you want | add |
+| --- | --- |
+| `memcpy`, `memset` and the other functions the compiler may emit | `std-freestanding-nolibc` |
+| the freestanding subset of the C++ standard library | `std-freestanding` with `features = ["nolibc"]` |
+| `std::vector`, `std::string` and the rest of the allocating half | the above, plus `features = ["alloc-kal"]` and an openkal implementation |
