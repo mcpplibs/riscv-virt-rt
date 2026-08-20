@@ -1,0 +1,35 @@
+[package]
+name    = "{{project.name}}"
+version = "0.1.0"
+
+[build]
+target = "riscv64-none-elf"
+# The memory map is this project's own — nothing else knows where this image is
+# loaded — and it is handed to the linker by build.mcpp rather than by
+# `ldflags`. See the note there: a relative path in `ldflags` resolves against
+# the build directory, not the project.
+
+# ⚠️ THE ONE LINE THAT MAKES THIS A KERNEL PROJECT.
+#
+# The target table binds a C library to every bare-metal triple, and every
+# other bare-metal template inherits it. An empty string declines it: no
+# headers reach the compile line, no library directory reaches the link, and
+# `#include <stdio.h>` stops resolving. What is left is the compiler, the ISA
+# and this source tree.
+[target.riscv64-none-elf]
+sysroot = ""
+
+# The emulator, named here rather than inherited from a board package — a
+# project with no C library has no board package either.
+runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic",
+          "-no-reboot", "-bios", "none", "-kernel"]
+
+# The five C functions the compiler is still entitled to emit calls to, even
+# from code that names none of them: [intro.compliance] has a freestanding
+# implementation provide memcpy, memmove, memset and memcmp, because structure
+# assignment and array initialisation are lowered onto them.
+#
+# Uncomment when the first one is needed. It is left out of the starting point
+# so that the first build demonstrates how little is actually required.
+# [dependencies]
+# std-freestanding-nolibc = "0.1.0"

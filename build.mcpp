@@ -12,10 +12,26 @@ import std;
 // never wrote down `xim:glibc`, and a bare-metal one should not have to write
 // down picolibc.
 //
-// What remains here is the part that is genuinely the board's, and it is a
-// short list: WHICH startup object and libraries to select out of that C
-// library, WHICH linker script describes this machine's memory, and HOW to
-// run an image. Location is a target fact; selection is a board fact.
+// ⚠️ AND WHAT LEFT IN 0.4.0: TWO NAMES THAT WERE NOT THIS BOARD'S TO KNOW.
+//
+// Until 0.3.0 this file also said `clang_rt.builtins-riscv64` and
+// `rv64gc/lp64d`. Neither is a board fact:
+//
+//   * which builtins library exists is decided by the COMPILER, and no board
+//     chooses to go without one — on rv64 the trigger is picolibc's printf
+//     doing 128-bit shifts, which the ISA has no instruction for;
+//   * where a profile's libraries sit is the C LIBRARY's multilib convention.
+//
+// The coupling was invisible: this package declares no dependency on LLVM and
+// none on picolibc, and could still serve neither a second toolchain nor a
+// second C library, because the names were written into the source. A declared
+// dependency is reviewable; a hardcoded name fails only when something is
+// swapped, which is when nobody is looking for it.
+//
+// What remains is the part that is genuinely the board's, and it is a short
+// list: WHICH startup object and libraries to select out of that C library,
+// WHICH linker script describes this machine's memory, and HOW to run an
+// image. Location is a target fact; selection is a board fact.
 int main() {
     const std::string arch = mcpp::target_arch() ? mcpp::target_arch() : "";
     const bool rv32 = (arch == "riscv32");
@@ -23,26 +39,43 @@ int main() {
     // ⚠️ Selected out of the C library, not located in it. `-L` for the target
     // sysroot is already on the link line, so these are bare names — which is
     // also what makes the same two lines work for both widths.
+    //
+    // The crt0 IS a board choice: `crt0-semihost` reaches the host through the
+    // debugger channel, and a board without one selects a UART crt0 instead.
+    // Its NAME, however, is the C library's. `mcpp::target_libc()` is asked
+    // rather than assumed so that a target on newlib can be served from this
+    // same file by extending the branch instead of forking it.
+    const std::string libc = mcpp::target_libc() ? mcpp::target_libc() : "";
+    if (!libc.starts_with("picolibc")) {
+        std::cerr << "riscv-virt-rt: this board is written against picolibc, and "
+                     "the target resolved '" << (libc.empty() ? "(none)" : libc)
+                  << "'.\n  The startup object and the linker script are named by "
+                     "the C library, so\n  serving this one needs a branch here "
+                     "rather than a different board.\n";
+        return 1;
+    }
     mcpp::link_lib("crt0-semihost");   // pulled from the archive by ENTRY(_start)
     mcpp::link_lib("c");
     mcpp::link_lib("semihost");
-    // ⚠️ Not optional, and not a target fact either. picolibc's printf formats
-    // floats through ryu, which does 128-bit shifts, and rv64 has no
-    // instruction for them — without the builtins the link fails on
-    // __ashlti3/__lshrti3. Note that a "does 64-bit division work" check does
-    // NOT reach this: rv64gc has a hardware divu.
-    mcpp::link_lib(std::format("clang_rt.builtins-{}",
-                               rv32 ? "riscv32" : "riscv64").c_str());
+
+    // ⚠️ Not optional, and not a board fact either. Without the builtins the
+    // link fails on __ashlti3/__lshrti3. Note that a "does 64-bit division
+    // work" check does NOT reach this: rv64gc has a hardware divu.
+    if (const char* b = mcpp::target_builtins_lib(); b && *b)
+        mcpp::link_lib(b);
 
     // The memory layout — the one thing a consumer cannot write for itself.
     //
     // ⚠️ Asked for, not declared. The board knows WHICH script describes this
-    // machine; where the target's C library put it is the engine's answer.
+    // machine; where the target's C library put it, and under which profile
+    // directory, are the engine's answers.
     // (A bare name would not do: link-script resolves relative paths against
     // the PACKAGE root, so `picolibcpp.ld` would point inside this package.)
-    if (const char* sysroot = mcpp::sysroot_dir(); sysroot && *sysroot)
-        mcpp::link_script(std::format("{}/lib/{}/picolibcpp.ld", sysroot,
-                                      rv32 ? "rv32imac/ilp32" : "rv64gc/lp64d").c_str());
+    const char* sysroot = mcpp::sysroot_dir();
+    const char* profile = mcpp::target_libc_profile();
+    if (sysroot && *sysroot && profile && *profile)
+        mcpp::link_script(
+            std::format("{}/lib/{}/picolibcpp.ld", sysroot, profile).c_str());
 
     // How to run it. ⚠️ Absolute path: a bare name resolves through PATH to a
     // shim that dispatches against its own owner home, which is not
@@ -56,5 +89,8 @@ int main() {
     }
 
     mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
+    mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC");
+    mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC_PROFILE");
+    mcpp::rerun_if_env_changed("MCPP_TARGET_BUILTINS_LIB");
     return 0;
 }

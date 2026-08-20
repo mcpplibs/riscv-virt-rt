@@ -1,0 +1,74 @@
+// {{project.name}} — a kernel starting point for QEMU's RISC-V `virt` machine.
+//
+// Built by `mcpp new {{project.name}} --template {{template.package.name}}:nolibc`.
+//
+// WHAT IS NOT UNDER THIS FILE
+//
+// No C library, no startup object, no board package, no runtime of any kind.
+// The manifest declines the target's C library with `sysroot = ""`, so what
+// remains beneath this source is the compiler, the instruction set, and the
+// linker script beside it. The image below is the whole program.
+//
+// That is the arrangement a kernel or a bootloader begins from, and it is a
+// different arrangement from the other bare-metal template: `--template
+// {{template.package.name}}` gives an ordinary `int main()` above picolibc,
+// which is the right starting point for firmware and the wrong one for
+// something that intends to provide a C library rather than consume one.
+//
+// WHAT THE THREE PIECES ARE
+//
+//   1. `_start`   — the first instruction executed. It establishes a stack,
+//                   because nothing else has, and then calls C++ code.
+//   2. `kmain`    — ordinary C++ from here on.
+//   3. the device — a store to a fixed address. On this machine the UART is at
+//                   0x10000000 and the power controller at 0x100000; both are
+//                   properties of `virt` and would differ on another board.
+
+namespace {
+
+// ⚠️ `volatile` is load-bearing and not decoration. Without it a compiler is
+// entitled to observe that these stores are never read back and remove them:
+// the loop below would be deleted entirely, and the program would run
+// correctly and print nothing.
+volatile unsigned char* const kUart     = reinterpret_cast<unsigned char*>(0x10000000);
+volatile unsigned int*  const kPowerOff = reinterpret_cast<unsigned int*>(0x100000);
+
+void put(char c) { *kUart = static_cast<unsigned char>(c); }
+
+void print(const char* s) { while (*s) put(*s++); }
+
+}  // namespace
+
+extern "C" void kmain() {
+    print("{{project.name}}: running with no C library\n");
+
+    // Ordinary C++ works here, as long as it needs no library beneath it.
+    // Templates, constexpr, classes and references are language facilities and
+    // cost nothing at run time; what is absent is not the language but the
+    // library, and `mcpp add std-freestanding` brings back the part of it that
+    // needs no operating system.
+    constexpr int kAnswer = 6 * 7;
+    char digits[8];
+    int n = 0;
+    for (int v = kAnswer; v > 0; v /= 10) digits[n++] = static_cast<char>('0' + v % 10);
+    print("answer ");
+    while (n-- > 0) put(digits[n]);
+    put('\n');
+
+    *kPowerOff = 0x5555;   // `virt`'s syscon: end the run on the program's terms
+    for (;;) {}
+}
+
+// The entry point, in assembly because a stack must exist before any compiled
+// function is entered. `__stack_top` is defined by link.ld.
+//
+// ⚠️ `.text.entry` is a section of its own so that the linker script can place
+// it first. The machine begins executing at the image's load address, not at
+// whichever function the linker happened to put there.
+asm(".section .text.entry\n"
+    ".globl _start\n"
+    "_start:\n"
+    "  la sp, __stack_top\n"
+    "  call kmain\n"
+    "1:\n"
+    "  j 1b\n");

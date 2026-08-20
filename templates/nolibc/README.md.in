@@ -1,0 +1,47 @@
+# {{project.name}}
+
+A kernel starting point for QEMU's RISC-V `virt` machine: no C library, no
+startup object, and no board package.
+
+```bash
+mcpp run                              # assemble, link, and boot under qemu
+mcpp build                            # image + .bin + .map + a size summary
+```
+
+## What is under this program
+
+Nothing but the compiler and the instruction set. The manifest declines the
+target's C library:
+
+```toml
+[target.riscv64-none-elf]
+sysroot = ""
+```
+
+With that line the C headers leave the compile line and the C library leaves
+the link. `#include <stdio.h>` stops resolving, and the image contains only
+what this source tree put in it.
+
+## The three pieces
+
+| | |
+|---|---|
+| `_start` | The first instruction executed. Establishes a stack, then calls C++. In assembly because a stack must exist before any compiled function is entered. |
+| `kmain` | Ordinary C++. Templates, `constexpr`, classes and references are language facilities and cost nothing here. |
+| `link.ld` | Where the image is loaded, and where the stack ends. The one file that changes when the board does. |
+
+## Growing from here
+
+| Need | Add |
+|---|---|
+| `memcpy`, `memmove`, `memset`, `memcmp`, `strlen` | `mcpp add std-freestanding-nolibc` — the compiler is entitled to emit calls to the first four from code that names none of them |
+| `array`, `span`, `optional`, `atomic`, `ranges` | `mcpp add std-freestanding` — the part of the standard library that needs no operating system |
+| `vector`, `string`, `map` | the subset's `alloc` feature, plus an allocator this program supplies |
+| A C library after all | remove the `sysroot = ""` line, and the target's own returns |
+
+## What this template is not
+
+`mcpp new <name> --template {{template.package.name}}` — without `:nolibc` —
+gives an ordinary `int main()` above picolibc, with a heap, `printf`, and a
+working `mcpp test`. That is the right starting point for firmware. This one is
+for a program that intends to provide a C library rather than to consume one.

@@ -1,0 +1,2 @@
+[template]
+description = "A kernel starting point: no C library, no startup object, no board package — an entry point, a memory map, and a device"

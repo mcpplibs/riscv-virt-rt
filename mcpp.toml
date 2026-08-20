@@ -1,8 +1,8 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.3.0"
-description = "Board support for QEMU's RISC-V `virt` machine — libc, startup, memory layout and runner"
+version     = "0.4.0"
+description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
 repo        = "https://github.com/mcpplibs/riscv-virt-rt"
@@ -14,3 +14,30 @@ repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 # really is a board fact: how to run an image.
 [xlings]
 deps = ["xim:qemu-riscv@9.2.4-1"]
+
+# ── openkal, when the consumer asks for it ───────────────────────────────────
+#
+# ⚠️ THE BACKEND BELONGS TO THE BOARD, AND THE SELECTION KEY IS THIS DEPENDENCY.
+#
+# openkal's design sketched a bare-metal backend chosen by an ISA-level
+# predicate, `cfg(all(arch = "riscv64", os = "none"))`. That key is wrong in the
+# quiet direction: a console is a store to a fixed address, and which address is
+# a BOARD fact. On a second RISC-V board the predicate still matches, the same
+# package is still selected, and the program writes to something that is not a
+# UART — it compiles, links, runs, and prints nothing.
+#
+# A bare-metal project already depends on its board. Making the board supply the
+# backend puts the selection where the knowledge is, and the consumer writes one
+# feature and no `cfg`.
+#
+# The core set only (abort, stream, memory). An implementation provides an
+# interface in whole or not at all, so the absence of fs, process, task, env and
+# time is not a deviation — `import openkal.task;` simply does not resolve.
+[features]
+default = []
+openkal = { sources = ["src/kal/**"] }
+
+# Resolved only when the feature is active, so a consumer that does not use
+# openkal pulls neither the declarations nor the implementation.
+[feature-deps.openkal]
+openkal = "0.5.1"

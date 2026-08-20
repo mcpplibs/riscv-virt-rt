@@ -1,0 +1,36 @@
+/* {{project.name}} — the memory map.
+ *
+ * QEMU's `virt` machine begins executing at 0x80000000 when started with
+ * `-bios none -kernel`, so that is where the image is placed. A different
+ * board would differ here and nowhere else in the project.
+ */
+ENTRY(_start)
+
+SECTIONS {
+    . = 0x80000000;
+
+    /* .text.entry first, and deliberately: execution begins at the load
+     * address, not at whichever function the linker chose to place there. */
+    .text : {
+        *(.text.entry)
+        *(.text*)
+    }
+
+    .rodata : { *(.rodata*) }
+    .data   : { *(.data*) }
+
+    /* Not zeroed by anything here. A C runtime would have done it before main;
+     * this program has none, so either _start clears it or the program does
+     * not rely on it. The symbols are exported so that either choice is
+     * available. */
+    .bss : {
+        __bss_start = .;
+        *(.bss*)
+        *(COMMON)
+        __bss_end = .;
+    }
+
+    . = ALIGN(16);
+    . = . + 0x4000;          /* 16 KiB of stack */
+    __stack_top = .;
+}

@@ -1,0 +1,19 @@
+import mcpp;
+import std;
+
+// The memory map, handed to the linker.
+//
+// ⚠️ WHY THIS IS NOT `[build] ldflags = ["-T", "link.ld"]`.
+//
+// The linker runs with the build directory as its working directory, so a
+// relative path in `ldflags` resolves against `target/<triple>/<fingerprint>/`
+// and not against the project. Measured: `cannot find linker script link.ld`.
+//
+// `mcpp:link-script=` exists for this. It is the directive a board-support
+// package uses for the same purpose, and it resolves a relative path against
+// the PACKAGE root — which for a root project is the project directory.
+int main() {
+    mcpp::link_script("link.ld");
+    mcpp::rerun_if_changed("link.ld");
+    return 0;
+}
