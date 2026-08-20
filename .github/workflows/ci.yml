@@ -275,7 +275,15 @@ jobs:
             # The dependency line the scaffolder writes, at the version under
             # test — by path, because that version is not published yet.
             if grep -q 'self = {' "templates/$t/template.toml"; then
-              feats=$(sed -n 's/.*features = \[\(.*\)\].*/\1/p' "templates/$t/template.toml")
+              # ⚠️ FROM THE `self =` LINE ONLY, AND ONLY THE FIRST MATCH.
+              # `template.toml`'s prose explains the feature by naming it, so a
+              # pattern over the whole file matched the comment as well and
+              # produced a two-line value — `features = ["nolibc"\n"nolibc"]`,
+              # which the manifest parser rejected with `expected ',' or ']'`.
+              # Parsing configuration with a pattern that also reads its
+              # documentation is the whole of that bug.
+              feats=$(grep -m1 '^self *=' "templates/$t/template.toml" \
+                        | sed -n 's/.*features = \[\([^]]*\)\].*/\1/p')
               printf '\n[dependencies]\nriscv-virt-rt = { path = "%s", features = [%s] }\n' \
                 "$GITHUB_WORKSPACE" "$feats" >> "$d/mcpp.toml"
             fi
