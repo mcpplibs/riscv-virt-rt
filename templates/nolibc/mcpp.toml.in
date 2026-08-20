@@ -32,4 +32,4 @@ runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic",
 # Uncomment when the first one is needed. It is left out of the starting point
 # so that the first build demonstrates how little is actually required.
 # [dependencies]
-# std-freestanding-nolibc = "0.1.0"
+# std-freestanding-nolibc = "0.1.1"
