@@ -168,18 +168,37 @@ jobs:
 
       # Both templates target the same machine; the difference is how much of
       # this board's datasheet each copies into the project. A template that
-      # generates a project which does not build is a defect that only the
-      # generated project can reveal — measured once already, on `nolibc`.
+      # generates a project which does not build is a defect only the generated
+      # project can reveal — measured once already, on `nolibc`.
+      #
+      # ⚠️ INSTANTIATED FROM THE WORKING TREE, NOT THROUGH `mcpp new`. The
+      # scaffolder resolves `--template` from the INDEX and takes no path, so
+      # asking it for a template this commit ADDS would resolve the previously
+      # published version and fail on a template it does not carry — the CI for
+      # a new template could never pass before that template was published.
+      # What belongs to this repository is the template's CONTENT; the
+      # scaffolder's own behaviour is covered by mcpp's e2e suite. Substituting
+      # the one placeholder is exactly what `mcpp new` does to these files.
       - name: Both zero-libc templates generate projects that build
         run: |
           for t in nolibc nolibc-bsp; do
-            rm -rf "/tmp/t-$t"; mkdir -p "/tmp/t-$t"
-            (cd "/tmp/t-$t" && mcpp new k --template "riscv-virt-rt:$t")
-            # ⚠️ The scaffolder resolves the template from the INDEX, so this
-            # exercises the published package. The dependency it writes (or
-            # declines to write) is part of what is under test.
-            (cd "/tmp/t-$t/k" && mcpp build)
-            echo "$t: $(find "/tmp/t-$t/k" -type f -not -path '*/target/*' | wc -l) files"
+            d="/tmp/t-$t"; rm -rf "$d"; mkdir -p "$d/src"
+            for f in mcpp.toml src/main.cpp; do
+              sed "s/{{project.name}}/k/g" "templates/$t/$f.in" > "$d/$f"
+            done
+            for extra in link.ld build.mcpp; do
+              [ -f "templates/$t/$extra.in" ] \
+                && sed "s/{{project.name}}/k/g" "templates/$t/$extra.in" > "$d/$extra"
+            done
+            # The dependency line the scaffolder writes, at the version under
+            # test — by path, because that version is not published yet.
+            if grep -q 'self = {' "templates/$t/template.toml"; then
+              feats=$(sed -n 's/.*features = \[\(.*\)\].*/\1/p' "templates/$t/template.toml")
+              printf '\n[dependencies]\nriscv-virt-rt = { path = "%s", features = [%s] }\n' \
+                "$GITHUB_WORKSPACE" "$feats" >> "$d/mcpp.toml"
+            fi
+            (cd "$d" && mcpp build --target riscv64-none-elf)
+            echo "$t: builds, $(find "$d" -type f -not -path '*/target/*' | wc -l) files"
           done
 
       - name: The artifact set a flasher needs
