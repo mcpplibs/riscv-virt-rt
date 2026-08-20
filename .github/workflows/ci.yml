@@ -88,8 +88,26 @@ jobs:
           # one of them answers "not installed" from the other.
           xlings install xim:qemu-riscv -y
           XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:qemu-riscv -y
-          # ⚠️ NOT picolibc: mcpp installs the target's C library itself, from
-          # the target's row. Installing it here would hide a regression in that.
+          # ⚠️ PICOLIBC TOO, AND THE COMMENT THAT USED TO STAND HERE WAS WRONG.
+          #
+          # It read: "NOT picolibc — mcpp installs the target's C library itself
+          # from the target's row; installing it here would hide a regression in
+          # that." mcpp does no such thing. It resolves the COMPILER through an
+          # installing call; the target's C library it only looks UP on disk,
+          # and when absent it silently adds no paths.
+          #
+          # The gap is closed for CONSUMERS by an install-time edge in this
+          # package's index descriptor — `deps` names `xim:picolibc-riscv`, and
+          # taking both away and rebuilding brings both back. That edge fires
+          # when the PACKAGE is installed, and a repository testing itself
+          # builds from its working tree, where nothing is installed and nothing
+          # fires. So the self-build has to be given what a consumer is given.
+          #
+          # Measured on a cold runner without it: `picolibc` appears nowhere in
+          # the whole log, and every build dies on `'stdio.h' file not found`
+          # pointing at this package's own module.
+          xlings install xim:picolibc-riscv -y
+          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:picolibc-riscv -y
 
       # ⚠️ TWICE, AND THE FIRST IS ALLOWED TO FAIL. THIS IS NOT SUPERSTITION.
       #
