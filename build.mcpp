@@ -95,27 +95,49 @@ int main() {
     // `features = ["nolibc"]` the board contributes what it knows that does not
     // depend on one; without it, the request really is contradictory and is
     // still refused, now naming the feature that resolves it.
-    if (libc.empty()) {
-        if (!mcpp::has_feature("nolibc")) {
-            std::cerr <<
-                "riscv-virt-rt: this project declined the target's C library\n"
-                "  (`[target.<triple>].sysroot = \"\"`) but asks this board for the\n"
-                "  picolibc arrangement, which is its console, its startup object and\n"
-                "  its linker script. Those cannot be supplied without one.\n"
-                "\n"
-                "  The board CAN serve this tier — a memory map, a UART console and\n"
-                "  an emulator to run under need no C library. Ask for that half:\n"
-                "\n"
-                "      riscv-virt-rt = { version = \"0.5.0\", features = [\"nolibc\"] }\n"
-                "\n"
-                "  To use the picolibc arrangement instead, remove the `sysroot` line.\n";
-            return 1;
-        }
-
+    // ⚠️ THE ZERO-LIBC ARRANGEMENT IS SELECTED BY A DECLARATION, NOT INFERRED
+    // FROM AN ABSENT C LIBRARY. THE DIFFERENCE IS NOT PEDANTRY; INFERRING IT
+    // WAS A BUG THAT ONLY A COLD MACHINE COULD SHOW.
+    //
+    // A first version of this branch refused when `mcpp::target_libc()` came
+    // back empty, on the reading that an empty answer means "this project
+    // declined the C library". It does not only mean that. mcpp installs the
+    // target's C library LAZILY, and the query is answered from the payload on
+    // disk — so on a machine that has never built for this target, the first
+    // pass reports no C library for a project that never declined one. The
+    // engine says as much where it fills the value in: "the install ... may
+    // legitimately not have run yet on a first pass".
+    //
+    // Measured: every local test passed, because picolibc was already
+    // installed here; CI failed on the package's own self-test, on a runner
+    // that deliberately does not pre-install it.
+    //
+    // The feature is unambiguous — a project either asked for this arrangement
+    // or it did not — so it is what selects, and it is tested before the C
+    // library is consulted at all.
+    if (mcpp::has_feature("nolibc")) {
         // The memory map. ⚠️ A package-relative path, which `link-script`
         // resolves against the PACKAGE root — so this names the board's own
         // file rather than something in the consumer's directory.
         mcpp::link_script("virt.ld");
+        emit_runner();
+        mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
+        mcpp::rerun_if_env_changed("MCPP_FEATURE_NOLIBC");
+        return 0;
+    }
+
+    // No C library YET, which is not the same as none. Contribute the runner —
+    // which emulator boots this machine does not depend on a C library — and
+    // nothing that would need one. The `rerun_if_env_changed` on
+    // MCPP_TARGET_LIBC at the end of the picolibc path below is what brings
+    // this program back once the install has happened and the name is known.
+    //
+    // A project that genuinely declined the C library and did NOT ask for the
+    // `nolibc` feature also lands here, and its link then fails naming the
+    // missing C library. That message is worse than a named refusal, and a
+    // named refusal is not available: from inside a build program these two
+    // situations are the same observation.
+    if (libc.empty()) {
         emit_runner();
         mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
         mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC");
