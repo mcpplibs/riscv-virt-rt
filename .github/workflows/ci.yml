@@ -126,12 +126,31 @@ jobs:
       # replaces it.
       - name: Warm the target world (mcpp installs the C library lazily)
         run: |
+          # The target C library, for the same reason the job above installs
+          # it: the index edge that gives a CONSUMER picolibc fires when the
+          # PACKAGE is installed, and this builds the working tree.
+          xlings install xim:picolibc-riscv -y
+          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:picolibc-riscv -y
           mcpp build --target riscv64-none-elf || true
 
       - name: Self-test (rv64)
         run: |
           mcpp build --target riscv64-none-elf
-          mcpp test  --target riscv64-none-elf 2>&1 | tee test64.log
+          # ⚠️ `--features openkal`, AND FOR TWO REASONS THAT POINT THE SAME WAY.
+          #
+          # The good reason: this package ships that feature, and a self-test
+          # that never activates it tests less than the package promises.
+          #
+          # The other reason is an engine defect, recorded here because the flag
+          # would otherwise look optional. Measured 2026-08-20: `mcpp build`
+          # excludes an inactive feature's sources and `mcpp test` compiles them.
+          # In prepare.cppm the ADD of feature globs runs in both modes while the
+          # DROP is gated on `!includeDevDeps` — a deliberate choice for gtest's
+          # `main` feature, whose file must stay visible to the per-test main
+          # detection, generalised to every package. So without this flag
+          # `mcpp test` compiles `src/kal/**` with the feature OFF and dies on
+          # `'openkal/abort.h' file not found`, while `mcpp build` is fine.
+          mcpp test  --target riscv64-none-elf --features openkal 2>&1 | tee test64.log
           # ⚠️ A suite that discovered nothing exits 0. Assert the case RAN.
           grep -q 'console ... ok' test64.log
 
@@ -140,7 +159,7 @@ jobs:
           # The second profile exists to prove the ISA table is data, not a
           # second copy of the package. It links; qemu-system-riscv32 boots it.
           mcpp build --target riscv32-none-elf
-          mcpp test  --target riscv32-none-elf 2>&1 | tee test32.log
+          mcpp test  --target riscv32-none-elf --features openkal 2>&1 | tee test32.log
           grep -q 'console ... ok' test32.log
 
       - name: The example is the README's claim, executed
