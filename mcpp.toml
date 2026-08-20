@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.5.0"
+version     = "0.5.1"
 description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -61,4 +61,4 @@ nolibc  = {}
 # Resolved only when the feature is active, so a consumer that does not use
 # openkal pulls neither the declarations nor the implementation.
 [feature-deps.openkal]
-openkal = "0.5.1"
+openkal = "0.5.2"

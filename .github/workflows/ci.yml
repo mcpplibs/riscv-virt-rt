@@ -385,6 +385,14 @@ jobs:
 
       - name: Both profiles cross-build
         run: |
+          # The target C library. ⚠️ The index descriptor's `deps` edge gives it
+          # to a CONSUMER when the PACKAGE is installed; every row of this matrix
+          # builds the working tree, where nothing is installed and that edge
+          # never fires. Without this the cross-build dies on
+          # `'stdio.h' file not found` inside this package's own module, on a
+          # machine that has simply never targeted this triple.
+          xlings install xim:picolibc-riscv -y
+          XLINGS_HOME="$HOME/.mcpp/registry" xlings install xim:picolibc-riscv -y
           # ⚠️ TWICE, AND THE FIRST IS ALLOWED TO FAIL — every row of this
           # matrix is a machine that has never targeted this triple, which is
           # precisely where mcpp's lazy install of the target C library shows.
