@@ -20,8 +20,21 @@ jobs:
       #   * 2026.8.19.3 is where `mcpp build` followed by `mcpp run` stopped
       #     exec'ing the firmware on the host instead of the emulator. The
       #     package works on .2; the documented workflow does not.
+      #   * 2026.8.20.2 is where `mcpp::target_libc`, `target_libc_profile` and
+      #     `target_builtins_lib` arrived. 0.4.0 removed three hardcoded names
+      #     from build.mcpp by asking for them instead, so this is a hard floor
+      #     for the package as well: below it build.mcpp does not compile.
+      #
+      # ⚠️ THIS PIN HAS BEEN WRONG TWICE, THE SAME WAY BOTH TIMES.
+      #
+      # A package developed against an unreleased engine gets a pin naming a
+      # version that does not exist yet, and CI reports `not found in the synced
+      # index` (0.3.0) or `no member named ...` (0.4.1) — never "the pin is from
+      # the future", which is what actually happened. The order that avoids it
+      # is: raise the pin, release the engine, then push.
+      #
       # CI pins what the README tells people to use.
-      MCPP_VERSION: 2026.8.19.4
+      MCPP_VERSION: 2026.8.20.2
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:
