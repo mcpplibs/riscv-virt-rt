@@ -1,2 +1,16 @@
 [template]
 description = "A kernel starting point: no C library, no startup object, no board package — an entry point, a memory map, and a device"
+
+# ⚠️ NO SELF-DEPENDENCY, AND THAT IS THE POINT OF THIS TEMPLATE.
+#
+# `mcpp new --template` normally writes the template's own package into the
+# generated manifest, so a template cannot drift from the library that ships it.
+# Here it would contradict the subject: this project targets a machine with no C
+# library, and this package's own module includes <stdio.h> — so the injected
+# dependency fails to compile before the project itself is even reached.
+#
+# Measured: with the injection, `mcpp run` on a freshly generated project died
+# on `riscv_virt_rt.cppm:9: fatal error: 'stdio.h' file not found`, in a project
+# whose manifest declares no dependencies at all.
+[template.inject]
+self = false

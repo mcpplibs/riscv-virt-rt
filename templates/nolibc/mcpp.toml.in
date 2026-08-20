@@ -19,8 +19,14 @@ target = "riscv64-none-elf"
 [target.riscv64-none-elf]
 sysroot = ""
 
-# The emulator, named here rather than inherited from a board package — a
-# project with no C library has no board package either.
+# How to run an image. Named here because this project has no board package to
+# supply it — that is the arrangement this template exists for.
+#
+# ⚠️ A BARE NAME, WITH A KNOWN COST. It resolves through PATH to a shim that
+# dispatches against whichever home owns it, which need not be the home this
+# build used. A board package names the emulator by absolute path for exactly
+# that reason; a project with no board package has no better option, and the
+# failure — if it comes — is "not installed" rather than a wrong emulator.
 runner = ["qemu-system-riscv64", "-machine", "virt", "-nographic",
           "-no-reboot", "-bios", "none", "-kernel"]
 

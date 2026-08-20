@@ -46,9 +46,53 @@ int main() {
     // rather than assumed so that a target on newlib can be served from this
     // same file by extending the branch instead of forking it.
     const std::string libc = mcpp::target_libc() ? mcpp::target_libc() : "";
+
+    // How to run an image. ⚠️ Emitted on BOTH paths below, because which
+    // emulator boots this machine is a board fact and has nothing to do with
+    // which C library compiled the image — a zero-libc kernel for `virt` is
+    // still a `virt` image. An earlier version returned before this point and
+    // left such a project with no runner at all.
+    //
+    // ⚠️ Absolute path: a bare name resolves through PATH to a shim that
+    // dispatches against its own owner home, which is not necessarily the home
+    // this build uses.
+    auto emit_runner = [&] {
+        if (const char* qemu = mcpp::xpkg_dir("xim", "qemu-riscv"); qemu && *qemu) {
+            mcpp::runner(std::format("{}/bin/qemu-system-{}", qemu,
+                                     rv32 ? "riscv32" : "riscv64").c_str());
+            for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
+                           "-semihosting", "-bios", "none", "-kernel"})
+                mcpp::runner(a);
+        }
+    };
+
+    // ⚠️ NO C LIBRARY IS NOT AN ERROR HERE, AND TREATING IT AS ONE WAS A BUG.
+    //
+    // A project on the zero-libc tier (`[target.<triple>].sysroot = ""`) is not
+    // asking this board for anything: it supplies its own entry point, its own
+    // memory map and its own device access. It may still carry this package as
+    // a dependency, because `mcpp new --template` writes the template's own
+    // package into the manifest at the version it resolved — which is what
+    // keeps a template from drifting from the library that ships it.
+    //
+    // Measured: `mcpp new k --template riscv-virt-rt:nolibc` then `mcpp run`
+    // failed here, on a template whose whole point is to depend on nothing.
+    // Contributing nothing is the correct answer; there is nothing to select
+    // out of a C library that is not there.
+    if (libc.empty()) {
+        emit_runner();
+        mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
+        mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC");
+        return 0;
+    }
+
+    // A C library that is present but is not the one this board is written
+    // against IS an error: the startup object and the linker script are named
+    // by the C library, and guessing at another one's names would fail later
+    // and less clearly.
     if (!libc.starts_with("picolibc")) {
         std::cerr << "riscv-virt-rt: this board is written against picolibc, and "
-                     "the target resolved '" << (libc.empty() ? "(none)" : libc)
+                     "the target resolved '" << libc
                   << "'.\n  The startup object and the linker script are named by "
                      "the C library, so\n  serving this one needs a branch here "
                      "rather than a different board.\n";
@@ -77,16 +121,7 @@ int main() {
         mcpp::link_script(
             std::format("{}/lib/{}/picolibcpp.ld", sysroot, profile).c_str());
 
-    // How to run it. ⚠️ Absolute path: a bare name resolves through PATH to a
-    // shim that dispatches against its own owner home, which is not
-    // necessarily the home this build uses.
-    if (const char* qemu = mcpp::xpkg_dir("xim", "qemu-riscv"); qemu && *qemu) {
-        mcpp::runner(std::format("{}/bin/qemu-system-{}", qemu,
-                                 rv32 ? "riscv32" : "riscv64").c_str());
-        for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
-                       "-semihosting", "-bios", "none", "-kernel"})
-            mcpp::runner(a);
-    }
+    emit_runner();
 
     mcpp::rerun_if_env_changed("MCPP_TARGET_ARCH");
     mcpp::rerun_if_env_changed("MCPP_TARGET_LIBC");
