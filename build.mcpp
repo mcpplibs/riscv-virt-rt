@@ -63,6 +63,25 @@ int main() {
             for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
                            "-semihosting", "-bios", "none", "-kernel"})
                 mcpp::runner(a);
+        } else {
+            // ⚠️ A BOARD PACKAGE NORMALLY NEVER REACHES THIS BRANCH, WHICH IS
+            // WHY IT NEEDS TO SPEAK WHEN IT DOES.
+            //
+            // The emulator is declared in this package's index descriptor under
+            // the platform `deps`, and those ARE installed with the package —
+            // so an ordinary consumer has it. Someone building this repository
+            // from a checkout has only the manifest's `[xlings] deps`, which is
+            // a declaration and not an install trigger: `xpkg_dir` answers
+            // empty, no runner is configured, and `mcpp run` then reports a
+            // missing runner with advice about writing a `runner` key — true in
+            // general, and not the cause here.
+            //
+            // Before mcpp 2026.8.21.2 this could not be said at all: a build
+            // program's output is printed only when it exits non-zero.
+            mcpp::warning(
+                "qemu-riscv is not installed, so `mcpp run` has no runner. "
+                "`mcpp build` is unaffected. Install it once:  "
+                "xlings install qemu-riscv -y");
         }
     };
 

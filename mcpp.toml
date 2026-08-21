@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.5.1"
+version     = "0.5.2"
 description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
