@@ -5,7 +5,7 @@ C++ project builds, runs and tests with no board knowledge of its own.
 
 ```toml
 [dependencies]
-mcpplibs.riscv-virt-rt = "0.3"
+mcpplibs.riscv-virt-rt = "0.6.0"
 
 [targets.firmware]
 kind = "bin"
@@ -40,7 +40,7 @@ kernel or a bootloader begins from, and this board serves it:
 
 ```toml
 [dependencies]
-riscv-virt-rt = { version = "0.5.0", features = ["nolibc"] }
+riscv-virt-rt = { version = "0.6.0", features = ["nolibc"] }
 ```
 
 ⭐ **The C library is a feature of how this board is consumed, not a property of
@@ -93,6 +93,39 @@ a load address, `-nostdlib`, `-mcmodel` — or an emulator. There is no
 | Startup | picolibc's semihosting `crt0`, so an ordinary `int main()` works |
 | Memory layout | picolibc's linker script for the `virt` map |
 | Runner | `qemu-system-riscv{32,64}` by **absolute path**, with the machine model and firmware mode |
+| openkal | the core interfaces — `abort`, `stream`, `memory` — behind `features = ["openkal"]`, see below |
+
+## openkal, behind a feature
+
+```toml
+[dependencies]
+riscv-virt-rt = { version = "0.6.0", features = ["openkal"] }
+```
+
+With that, a program on this board can be written against
+[openkal](https://github.com/mcpplibs/openkal) 0.9.0 rather than against this
+board, and the same source builds for a hosted machine over `openkal-linux`.
+
+⚠️ **The selection key is the board, not the instruction set.** openkal's own
+design sketched a backend chosen by `cfg(all(arch = "riscv64", os = "none"))`,
+and that is wrong in the quiet direction: the console is a store to a fixed
+address, and which address is a *board* fact. On a second RISC-V board the same
+predicate matches, the same package is selected, and the program writes to
+something that is not a UART — it compiles, links, runs and prints nothing. So
+the implementation lives here, with the board, and the consumer writes one
+feature and no `cfg` at all.
+
+⭐ **The core set only, and that is not a deviation.** An implementation provides
+an interface in whole or not at all, so the absence of `fs`, `process`, `task`,
+`env` and `time` means `import openkal.task;` does not resolve — which is the
+diagnostic a bare-metal author wants, rather than an operation that is present
+and always fails. `kal_interfaces()` reports exactly the three, so a consumer
+that cannot ask the linker gets the same answer.
+
+`kal_memory_granularity()` answers **1**: this machine has no memory management
+unit and this implementation imposes no rounding of its own, so every address
+and every length is acceptable. ⚠️ That is not a page size, and a C library
+above it must impose its own floor rather than adopt this number.
 
 ## Targets
 

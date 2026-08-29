@@ -153,6 +153,14 @@ jobs:
           mcpp test  --target riscv64-none-elf --features openkal 2>&1 | tee test64.log
           # ⚠️ A suite that discovered nothing exits 0. Assert the case RAN.
           grep -q 'console ... ok' test64.log
+          # ⚠️⚠️ AND THE openkal CASE, ON THE LINE IT PRINTS ONLY WHEN IT ASKED.
+          #
+          # `tests/openkal.cpp` compiles to a program that returns 0 either way:
+          # with the feature it exercises the implementation, without it there is
+          # nothing to ask and it says so. `openkal ... ok` therefore does not
+          # distinguish the two, and neither does the suite's exit status. This
+          # is the line that only the first prints.
+          grep -q 'openkal: every observation held' test64.log
 
       - name: Self-test (rv32)
         run: |
@@ -161,6 +169,9 @@ jobs:
           mcpp build --target riscv32-none-elf
           mcpp test  --target riscv32-none-elf --features openkal 2>&1 | tee test32.log
           grep -q 'console ... ok' test32.log
+          # The openkal implementation is compiled for both widths, so it is
+          # asserted for both: `kal_uintptr` is thirty-two bits here.
+          grep -q 'openkal: every observation held' test32.log
 
       - name: The example is the README's claim, executed
         working-directory: examples/blinky
