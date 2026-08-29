@@ -40,6 +40,7 @@
 #include <openkal/abort.h>
 #include <openkal/memory.h>
 #include <openkal/stream.h>
+#include <openkal/version.h>
 
 namespace {
 // Handles are opaque to the caller. Small indices suffice here because this
@@ -50,6 +51,24 @@ constexpr kal_uintptr kStderr = 2;
 }  // namespace
 
 extern "C" {
+
+// ── openkal, the specification's own self-description ───────────────────────
+//
+// ⚠️ NOT AN INTERFACE, AND EXPORTED ANYWAY. These two provide no resource, so
+// clause 3.2's closure of the core SET is untouched; every conforming
+// implementation exports them, including one for a machine with no operating
+// system, so that a consumer with no linker to ask can ask before it calls.
+//
+// ⭐ `kal_interfaces' NAMES ONLY WHAT THIS FILE DEFINES. A word claiming an
+// interface this implementation does not export would mislead exactly the
+// consumer that has no other way to ask --- and openkal's conformance suite
+// checks the word against the linker for that reason. Three interfaces, which
+// is the core set and the whole of what a board can promise.
+kal_u64 kal_version(void) { return KAL_VERSION; }
+
+kal_u64 kal_interfaces(void) {
+    return KAL_IFACE_ABORT | KAL_IFACE_STREAM | KAL_IFACE_MEMORY;
+}
 
 // ── openkal.abort ───────────────────────────────────────────────────────────
 //
@@ -74,29 +93,42 @@ kal_stream kal_stdin (void) { return kal_stream{kStdin};  }
 kal_stream kal_stdout(void) { return kal_stream{kStdout}; }
 kal_stream kal_stderr(void) { return kal_stream{kStderr}; }
 
-kal_io_result kal_stream_write(kal_stream s, const void* buf, kal_uintptr n) {
+// ⭐ ONE SIGNED WORD: THE COUNT, OR THE NEGATED CONDITION.
+//
+// These returned `kal_io_result', a pair of a count and a condition, which
+// openkal 0.9 withdrew. The pair was two machine words where one carries the
+// whole answer, and every caller in the ecosystem was collapsing it by hand at
+// the call site --- so the collapse is now the contract. A count of zero is a
+// count and not a failure; a failure is a negative value drawn from the closed
+// error set.
+kal_intptr kal_stream_write(kal_stream s, const void* buf, kal_uintptr n) {
     FILE* f = s.h == kStdout ? stdout : s.h == kStderr ? stderr : nullptr;
-    if (!f) return kal_io_result{0, kal_err_invalid};
+    if (!f) return -kal_err_invalid;
     // ⚠️ Written in full or reported, never short. openkal moved the retry
     // loop into the implementation precisely so that every caller would not
     // have to write one; POSIX's convention of returning a short count is what
     // makes that necessary elsewhere.
+    //
+    // ⚠️ AND A PARTIAL WRITE THAT THEN FAILS REPORTS THE COUNT, NOT THE
+    // CONDITION. The bytes reached the device and a caller that was told
+    // `kal_err_io' would send them twice. The condition is reported only when
+    // nothing moved, which is what the one-word form means.
     const auto* p = static_cast<const unsigned char*>(buf);
     kal_uintptr done = 0;
     while (done < n) {
         const auto wrote = fwrite(p + done, 1, n - done, f);
-        if (wrote == 0) return kal_io_result{done, kal_err_io};
+        if (wrote == 0) return done ? static_cast<kal_intptr>(done) : -kal_err_io;
         done += wrote;
     }
-    return kal_io_result{done, kal_ok};
+    return static_cast<kal_intptr>(done);
 }
 
-kal_io_result kal_stream_read(kal_stream s, void* buf, kal_uintptr n) {
-    if (s.h != kStdin) return kal_io_result{0, kal_err_invalid};
+kal_intptr kal_stream_read(kal_stream s, void* buf, kal_uintptr n) {
+    if (s.h != kStdin) return -kal_err_invalid;
     const auto got = fread(buf, 1, n, stdin);
     // End of input is a zero-length success, not an error: semihosting reports
-    // it the same way a closed pipe does.
-    return kal_io_result{static_cast<kal_uintptr>(got), kal_ok};
+    // it the same way a closed pipe does, and zero is a count.
+    return static_cast<kal_intptr>(got);
 }
 
 int kal_stream_flush(kal_stream s) {
@@ -141,5 +173,21 @@ void* kal_alloc(kal_uintptr size, kal_uintptr align) {
 }
 
 void kal_free(void* p, kal_uintptr, kal_uintptr) { free(p); }
+
+// ⭐ ONE, AND IT IS A STATEMENT RATHER THAN A PLACEHOLDER.
+//
+// The quantum this environment allocates and protects memory in. This machine
+// has no memory management unit and this implementation imposes no rounding of
+// its own --- it is picolibc's allocator underneath --- so every address and
+// every length is acceptable, and the specification spells that `1'.
+//
+// ⚠️ A CONSUMER MUST NOT READ THIS AS A PAGE SIZE. openkal-musl 0.7.0 took a
+// granularity of one from another such implementation and assigned it to
+// `libc.page_size', whose allocator assumes a power of two no smaller than its
+// own quantum; it then asked the environment for one-byte extents and stopped
+// inside the first allocation large enough to grow the heap. The remedy was at
+// the seam, where the answer is taken as a floor to respect rather than as the
+// value --- not here, because one is the true answer for this machine.
+kal_uintptr kal_memory_granularity(void) { return 1; }
 
 }  // extern "C"
