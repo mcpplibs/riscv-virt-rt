@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.6.0"
+version     = "0.6.1"
 description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -12,8 +12,26 @@ repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 # it from the target's own row exactly as it resolves the compiler — a hosted
 # project does not declare glibc either. What is left is the one thing that
 # really is a board fact: how to run an image.
+#
+# ⚠️ BOTH SPELLINGS, AND THE PAIR IS THE MIGRATION.
+#
+# `[xlings.workspace]` is the one table since mcpp 2026.9.3.1, and a namespaced
+# package is written `"<namespace>:<name>" = "<version>"` — an entry names a
+# package and then says which version of it, which is the form every official
+# package uses. `deps` is the older spelling of the same statement and is still
+# honoured. An engine that understands both collapses them into one entry,
+# because they agree; an engine that predates the table reads `deps` and
+# behaves exactly as it does today.
+#
+# Dropping the `deps` line would be a silent regression there: an older mcpp
+# parses `[xlings.workspace]` perfectly well and provisions nothing from it, so
+# this package's own `build.mcpp` would find no emulator and configure no
+# runner. The line goes once no supported engine is older than the table.
 [xlings]
 deps = ["xim:qemu-riscv@9.2.4-1"]
+
+[xlings.workspace]
+"xim:qemu-riscv" = "9.2.4-1"
 
 # ── openkal, when the consumer asks for it ───────────────────────────────────
 #
