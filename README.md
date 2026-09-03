@@ -161,7 +161,7 @@ not from a second copy of this file.
   name is absent, not `false` — a requires-expression over a qualified name
   that does not exist is ill-formed. There is no in-language feature test, so
   the version is documented and the diagnostic above is the fallback.
-- `xim:qemu-riscv`, declared in `[xlings.workspace]` and located through
+- `xim:qemu-riscv`, declared in `[xlings.workspace]` as `"xim:qemu-riscv" = "9.2.4-1"` and located through
   `mcpp::xpkg_dir`. The manifest carries the older `[xlings] deps` spelling of
   the same statement beside it: an engine that knows the table collapses the
   two, and one that predates it reads `deps` and behaves as before. The older

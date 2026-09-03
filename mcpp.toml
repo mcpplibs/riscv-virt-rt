@@ -15,10 +15,13 @@ repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 #
 # ⚠️ BOTH SPELLINGS, AND THE PAIR IS THE MIGRATION.
 #
-# `[xlings.workspace]` is the one table since mcpp 2026.9.3.1; `deps` is the
-# older spelling of the same statement and is still honoured. An engine that
-# understands both collapses them into one entry, because they agree; an engine
-# that predates the table reads `deps` and behaves exactly as it does today.
+# `[xlings.workspace]` is the one table since mcpp 2026.9.3.1, and a namespaced
+# package is written `"<namespace>:<name>" = "<version>"` — an entry names a
+# package and then says which version of it, which is the form every official
+# package uses. `deps` is the older spelling of the same statement and is still
+# honoured. An engine that understands both collapses them into one entry,
+# because they agree; an engine that predates the table reads `deps` and
+# behaves exactly as it does today.
 #
 # Dropping the `deps` line would be a silent regression there: an older mcpp
 # parses `[xlings.workspace]` perfectly well and provisions nothing from it, so
@@ -28,7 +31,7 @@ repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 deps = ["xim:qemu-riscv@9.2.4-1"]
 
 [xlings.workspace]
-qemu-riscv = "xim:9.2.4-1"
+"xim:qemu-riscv" = "9.2.4-1"
 
 # ── openkal, when the consumer asks for it ───────────────────────────────────
 #
