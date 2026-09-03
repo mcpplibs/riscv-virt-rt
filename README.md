@@ -161,8 +161,11 @@ not from a second copy of this file.
   name is absent, not `false` — a requires-expression over a qualified name
   that does not exist is ill-formed. There is no in-language feature test, so
   the version is documented and the diagnostic above is the fallback.
-- `xim:qemu-riscv`, declared in `[xlings].deps` and located through
-  `mcpp::xpkg_dir`.
+- `xim:qemu-riscv`, declared in `[xlings.workspace]` and located through
+  `mcpp::xpkg_dir`. The manifest carries the older `[xlings] deps` spelling of
+  the same statement beside it: an engine that knows the table collapses the
+  two, and one that predates it reads `deps` and behaves as before. The older
+  line goes once no supported engine needs it.
 
   ⚠️ The target's **C library is not declared here** and should not be. It is a
   property of the target, and mcpp resolves it from the target's own row the
