@@ -34,7 +34,20 @@ jobs:
       # is: raise the pin, release the engine, then push.
       #
       # CI pins what the README tells people to use.
-      MCPP_VERSION: 2026.9.3.2
+      # ⚠️⚠️ 2026.9.4.2, AND THE REASON IS THIS PACKAGE'S OWN CHANGE.
+      #
+      # The runner names its program by bare name, and mcpp searches the payload
+      # a manifest declared before it searches PATH. #544 shipped that search
+      # over the ROOT project's declarations only — so the bare name resolved
+      # when the CONSUMER declared the emulator and failed when THIS package
+      # did, which is backwards and is the duplication a board package exists to
+      # remove. 2026.9.4.2 extends both the search and the provisioning to every
+      # package in the graph.
+      #
+      # ⚠️ CI pins what the README tells people to use, and this package must
+      # not be PUBLISHED before that engine is: publishing first would leave the
+      # board broken on every engine that already has it.
+      MCPP_VERSION: 2026.9.4.2
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:
@@ -346,7 +359,7 @@ jobs:
       run:
         shell: bash
     env:
-      MCPP_VERSION: 2026.9.3.2
+      MCPP_VERSION: 2026.9.4.2
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:

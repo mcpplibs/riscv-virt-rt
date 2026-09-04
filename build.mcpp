@@ -53,36 +53,32 @@ int main() {
     // still a `virt` image. An earlier version returned before this point and
     // left such a project with no runner at all.
     //
-    // ⚠️ Absolute path: a bare name resolves through PATH to a shim that
-    // dispatches against its own owner home, which is not necessarily the home
-    // this build uses.
+    // ⭐⭐ THE BARE NAME, AND THE ENGINE FINDS IT.
+    //
+    // This used to compute an absolute path from `mcpp::xpkg_dir`, on the
+    // grounds — correct when it was written — that a bare name resolves through
+    // PATH to a shim dispatching against its own owner home.
+    //
+    // `mcpp.build.runner_lookup` (mcpp #544) removed that: it searches the bin/
+    // of every payload declared under `[xlings.workspace]` by any package in
+    // the graph BEFORE it looks at PATH, and reports which directories it
+    // searched when the program is nowhere.
+    //
+    // ⚠️ THE WHOLE-GRAPH HALF ARRIVED IN 2026.9.4.2, WHICH IS THIS PACKAGE'S
+    // FLOOR. Before it the search covered only the ROOT project's declarations,
+    // so a consumer of this board had to declare the emulator a second time —
+    // the duplication a board package exists to remove.
+    //
+    // ⚠️ AND IT DELETES A FAILURE MODE RATHER THAN MOVING IT. `xpkg_dir`
+    // answered empty for anyone building from a checkout, so the old shape
+    // configured no runner at all and needed an advisory to say why. There is
+    // nothing to say here: if the emulator is absent, the lookup names where it
+    // looked.
     auto emit_runner = [&] {
-        if (const char* qemu = mcpp::xpkg_dir("xim", "qemu-riscv"); qemu && *qemu) {
-            mcpp::runner(std::format("{}/bin/qemu-system-{}", qemu,
-                                     rv32 ? "riscv32" : "riscv64").c_str());
-            for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
-                           "-semihosting", "-bios", "none", "-kernel"})
-                mcpp::runner(a);
-        } else {
-            // ⚠️ A BOARD PACKAGE NORMALLY NEVER REACHES THIS BRANCH, WHICH IS
-            // WHY IT NEEDS TO SPEAK WHEN IT DOES.
-            //
-            // The emulator is declared in this package's index descriptor under
-            // the platform `deps`, and those ARE installed with the package —
-            // so an ordinary consumer has it. Someone building this repository
-            // from a checkout has only the manifest's `[xlings] deps`, which is
-            // a declaration and not an install trigger: `xpkg_dir` answers
-            // empty, no runner is configured, and `mcpp run` then reports a
-            // missing runner with advice about writing a `runner` key — true in
-            // general, and not the cause here.
-            //
-            // Before mcpp 2026.8.21.2 this could not be said at all: a build
-            // program's output is printed only when it exits non-zero.
-            mcpp::warning(
-                "qemu-riscv is not installed, so `mcpp run` has no runner. "
-                "`mcpp build` is unaffected. Install it once:  "
-                "xlings install qemu-riscv -y");
-        }
+        mcpp::runner(rv32 ? "qemu-system-riscv32" : "qemu-system-riscv64");
+        for (auto a : {"-machine", "virt", "-nographic", "-no-reboot",
+                       "-semihosting", "-bios", "none", "-kernel"})
+            mcpp::runner(a);
     };
 
     // ⚠️ NO C LIBRARY IS A SUPPORTED WAY TO USE THIS BOARD, AND ARRIVING AT
