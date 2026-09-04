@@ -93,6 +93,42 @@ jobs:
           mcpp --version
           mcpp self config --mirror GLOBAL
 
+      # THE EMULATOR IS A `run` TOOL, AND THE PAIR IS THE ASSERTION.
+      #
+      # "A build does not ask for xim:qemu-riscv" is also true when the package is
+      # broken and asks for nothing at all, so it proves nothing on its own. The
+      # second half — a run asks for it BY NAME — is what makes the first half
+      # mean the tier is applied rather than that the whole declaration is
+      # ignored.
+      #
+      # A COLD `MCPP_HOME` IS WHAT MAKES THIS MEASURABLE. `MCPP_NO_AUTO_INSTALL`
+      # reports what WOULD be installed, so on a machine where the emulator is
+      # already present there is nothing to report and both halves read empty.
+      # Measured on a developer machine with it installed: the run half went
+      # silent and the step passed without testing anything. An isolated home
+      # has nothing installed, so what a verb needs is what it says.
+      #
+      # Nothing is downloaded here: `MCPP_NO_AUTO_INSTALL` refuses rather than
+      # fetches, which is why this can run in an ordinary build job.
+      - name: The emulator is asked for by a run and not by a build
+        working-directory: examples/blinky
+        run: |
+          set -euo pipefail
+          COLD=$(mktemp -d)
+          MCPP_HOME="$COLD" MCPP_NO_AUTO_INSTALL=1 mcpp build > tier-build.log 2>&1 || true
+          MCPP_HOME="$COLD" MCPP_NO_AUTO_INSTALL=1 mcpp run   > tier-run.log   2>&1 || true
+          if grep -q 'xim:qemu-riscv' tier-build.log; then
+            cat tier-build.log
+            echo "::error::a build asked for the emulator; the run tier is not applied"
+            exit 1
+          fi
+          grep -q 'xim:qemu-riscv' tier-run.log || {
+            cat tier-run.log
+            echo "::error::a run did not ask for the emulator; the declaration is being ignored"
+            exit 1
+          }
+          echo "  ok  build asks for no emulator, run asks for xim:qemu-riscv"
+
       - name: Install the target world
         run: |
           # ⚠️ BOTH homes, and this is not belt-and-braces. The shim on PATH
