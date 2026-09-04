@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "riscv-virt-rt"
-version     = "0.7.0"
+version     = "0.7.1"
 description = "Board support for QEMU's RISC-V `virt` machine — startup selection, memory layout, runner, and an optional openkal backend"
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -30,8 +30,20 @@ repo        = "https://github.com/mcpplibs/riscv-virt-rt"
 [xlings]
 deps = ["xim:qemu-riscv@9.2.4-1"]
 
+# THE EMULATOR IS A `run` TOOL, AND SAYING SO IS WHAT KEEPS A BUILD FROM
+# DOWNLOADING IT.
+#
+# The untiered form means `Always`: provisioned by every verb that builds. A CI
+# job that compiles firmware and never runs it then downloads 33 MB of emulator
+# for nothing, and so does a contributor who only wants to know whether the
+# tree still compiles. `when = "run"` moves it to the verbs that execute the
+# artefact — `mcpp run` and `mcpp test`.
+#
+# `[xlings] deps` above is a different question and stays as it is: it declares
+# what this package needs present, while this table declares WHEN the workspace
+# provisions it.
 [xlings.workspace]
-"xim:qemu-riscv" = "9.2.4-1"
+"xim:qemu-riscv" = { version = "9.2.4-1", when = "run" }
 
 # ── openkal, when the consumer asks for it ───────────────────────────────────
 #
